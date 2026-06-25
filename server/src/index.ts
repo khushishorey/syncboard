@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import connectDB from './config/database';
+import authRoutes from './routes/auth';
 
 dotenv.config();
 
@@ -23,6 +25,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'SyncBoard server is running' });
 });
 
+app.use('/api/auth', authRoutes);
+
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
   socket.on('disconnect', () => {
@@ -32,6 +36,9 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Connect to DB first, then start the server
+connectDB().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 });
