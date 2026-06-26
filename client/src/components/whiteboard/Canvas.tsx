@@ -2,27 +2,40 @@ import { useRef, useCallback, useEffect } from 'react';
 import { Stage, Layer, Line } from 'react-konva';
 import Konva from 'konva';
 import { nanoid } from 'nanoid';
+import { throttle } from 'lodash';
 import { useBoardStore } from '../../store/boardStore';
 import { useToolStore } from '../../store/toolStore';
 import { useAuthStore } from '../../store/authStore';
 import type { Point, Stroke } from '../../types';
 
+// Install lodash if not already present:
+// npm install lodash @types/lodash
+
 interface Props {
   width: number;
   height: number;
+  onCursorMove: (x: number, y: number) => void;
+  onStrokeCommit: (stroke: Stroke) => void;
 }
 
-const Canvas = ({ width, height }: Props) => {
+const Canvas = ({ width, height, onCursorMove, onStrokeCommit }: Props) => {
   const stageRef = useRef<Konva.Stage>(null);
   const isDrawing = useRef(false);
 
-  const { strokes, currentStroke, startStroke, appendPoint, commitStroke } =
+  const { strokes, currentStroke, startStroke, appendPoint, commitStroke, undo, redo } =
     useBoardStore();
   const { activeTool, activeColor, brushSize } = useToolStore();
   const { user } = useAuthStore();
 
-  // Keyboard shortcuts for undo/redo
-  const { undo, redo } = useBoardStore();
+  // Throttled cursor emitter — fires at most every 32ms (~30fps)
+  // Local rendering stays at full 60fps
+  const throttledCursorEmit = useRef(
+    throttle((x: number, y: number) => {
+      onCursorMove(x, y);
+    }, 32)
+  ).current;
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -68,15 +81,22 @@ const Canvas = ({ width, height }: Props) => {
     if (!pos) return;
 
     appendPoint(pos);
-  }, [appendPoint]);
+    throttledCursorEmit(pos.x, pos.y);
+  }, [appendPoint, throttledCursorEmit]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing.current) return;
     isDrawing.current = false;
-    commitStroke();
-  }, [commitStroke]);
 
-  // Render a single stroke as a Konva Line
+    const { currentStroke: stroke } = useBoardStore.getState();
+    commitStroke();
+
+    // Notify parent (WhiteboardPage) so it can emit to socket
+    if (stroke && stroke.points.length >= 2) {
+      onStrokeCommit(stroke);
+    }
+  }, [commitStroke, onStrokeCommit]);
+
   const renderStroke = (stroke: Stroke, isCurrent = false) => {
     const flatPoints = stroke.points.flatMap((p) => [p.x, p.y]);
     if (flatPoints.length < 2) return null;
@@ -93,7 +113,7 @@ const Canvas = ({ width, height }: Props) => {
         globalCompositeOperation={
           stroke.tool === 'eraser' ? 'destination-out' : 'source-over'
         }
-        listening={false}   // canvas elements don't need to catch events
+        listening={false}
       />
     );
   };
@@ -106,17 +126,9 @@ const Canvas = ({ width, height }: Props) => {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}   // treat leaving the canvas as mouse up
+      onMouseLeave={handleMouseUp}
       style={{ cursor: activeTool === 'eraser' ? 'cell' : 'crosshair' }}
     >
-      {/*
-        Two layers:
-        1. drawingLayer — all committed strokes (eraser uses destination-out)
-        2. currentLayer — the stroke being drawn right now (on top)
-
-        Keeping them separate means the eraser on the bottom layer
-        doesn't cut through the currently-drawing stroke preview.
-      */}
       <Layer>
         {strokes.map((stroke) => renderStroke(stroke))}
       </Layer>

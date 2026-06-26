@@ -3,15 +3,13 @@ import { useBoardStore } from '../../store/boardStore';
 interface Props {
   roomName: string;
   onLeave: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onClear: () => void;
 }
 
-const BoardControls = ({ roomName, onLeave }: Props) => {
-  const { undo, redo, clearBoard, undoStack, redoStack } = useBoardStore();
-
-  const handleClear = () => {
-    const confirmed = window.confirm('Clear the entire board? This cannot be undone.');
-    if (confirmed) clearBoard();
-  };
+const BoardControls = ({ roomName, onLeave, onUndo, onRedo, onClear }: Props) => {
+  const { undoStack, redoStack } = useBoardStore();
 
   return (
     <div className="absolute top-4 left-0 right-0 z-10 flex items-center justify-between px-4 pointer-events-none">
@@ -31,47 +29,25 @@ const BoardControls = ({ roomName, onLeave }: Props) => {
 
       {/* Controls — right */}
       <div className="pointer-events-auto flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2">
-        <ControlButton
-          label="↩"
-          title="Undo"
-          disabled={undoStack.length === 0}
-          onClick={undo}
-        />
-        <ControlButton
-          label="↪"
-          title="Redo"
-          disabled={redoStack.length === 0}
-          onClick={redo}
-        />
+        <ControlButton label="↩" title="Undo (Ctrl+Z)" disabled={undoStack.length === 0} onClick={onUndo} />
+        <ControlButton label="↪" title="Redo (Ctrl+Y)" disabled={redoStack.length === 0} onClick={onRedo} />
         <div className="w-px h-5 bg-slate-600 mx-1" />
-        <ControlButton
-          label="🗑"
-          title="Clear board"
-          disabled={false}
-          onClick={handleClear}
-        />
+        <ControlButton label="🗑" title="Clear board" disabled={false} onClick={onClear} />
       </div>
     </div>
   );
 };
 
 const ControlButton = ({
-  label,
-  title,
-  disabled,
-  onClick,
+  label, title, disabled, onClick,
 }: {
-  label: string;
-  title: string;
-  disabled: boolean;
-  onClick: () => void;
+  label: string; title: string; disabled: boolean; onClick: () => void;
 }) => (
   <button
     title={title}
     disabled={disabled}
     onClick={onClick}
-    className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition
-      hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+    className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
   >
     {label}
   </button>

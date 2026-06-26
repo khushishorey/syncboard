@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/database';
 import authRoutes from './routes/auth';
 import roomRoutes from './routes/rooms';
+import { initializeSocket } from './socket';
 
 dotenv.config();
 
@@ -29,12 +30,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 
-io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
-  socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-  });
-});
+// Initialize all socket logic
+initializeSocket(io);
 
 const PORT = process.env.PORT || 5000;
 

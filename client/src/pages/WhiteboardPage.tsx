@@ -3,10 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../store/roomStore';
 import { useBoardStore } from '../store/boardStore';
 import { useAuthStore } from '../store/authStore';
+import { useSocket } from '../hooks/useSocket';
 import Canvas from '../components/whiteboard/Canvas';
 import Toolbar from '../components/whiteboard/Toolbar';
 import BoardControls from '../components/whiteboard/BoardControls';
+import RemoteCursors from '../components/whiteboard/RemoteCursors';
+import OnlineUsers from '../components/whiteboard/OnlineUsers';
 import useWindowSize from '../hooks/useWindowSize';
+import type { Stroke } from '../types';
 
 const WhiteboardPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,23 +18,23 @@ const WhiteboardPage = () => {
   const { width, height } = useWindowSize();
 
   const { currentRoom, setCurrentRoom } = useRoomStore();
-  const { clearBoard } = useBoardStore();
+  const { clearBoard, undo, redo } = useBoardStore();
   const { user } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // All socket logic lives here
+  const { emitCursorMove, emitDraw, emitUndo, emitRedo, emitClearBoard } =
+    useSocket(id || '');
+
   useEffect(() => {
     const loadRoom = async () => {
       if (!id) return;
-
-      // If we already have the room in store (came from dashboard), use it
       if (currentRoom?._id === id) {
         setLoading(false);
         return;
       }
-
-      // Otherwise fetch it
       try {
         const { api } = await import('../lib/api');
         const { data } = await api.get(`/rooms/${id}`);
@@ -43,8 +47,6 @@ const WhiteboardPage = () => {
     };
 
     loadRoom();
-
-    // Clear board state when entering a room
     clearBoard();
   }, [id]);
 
@@ -52,6 +54,37 @@ const WhiteboardPage = () => {
     setCurrentRoom(null);
     clearBoard();
     navigate('/dashboard');
+  };
+
+  // Called by Canvas when a stroke is committed
+  const handleStrokeCommit = (stroke: Stroke) => {
+    emitDraw(stroke);
+  };
+
+  // Undo with socket sync
+  const handleUndo = () => {
+    const { undoStack } = useBoardStore.getState();
+    if (undoStack.length === 0) return;
+    const lastId = undoStack[undoStack.length - 1];
+    undo();
+    emitUndo(lastId);
+  };
+
+  // Redo with socket sync
+  const handleRedo = () => {
+    const { redoStack } = useBoardStore.getState();
+    if (redoStack.length === 0) return;
+    const stroke = redoStack[redoStack.length - 1];
+    redo();
+    emitRedo(stroke);
+  };
+
+  // Clear with socket sync
+  const handleClear = () => {
+    const confirmed = window.confirm('Clear the entire board for everyone?');
+    if (!confirmed) return;
+    clearBoard();
+    emitClearBoard();
   };
 
   if (loading) {
@@ -81,35 +114,31 @@ const WhiteboardPage = () => {
       className="relative overflow-hidden"
       style={{ width: '100vw', height: '100vh', background: '#0f172a' }}
     >
-      {/* The canvas fills the entire viewport */}
-      <Canvas width={width} height={height} />
+      {/* Full-viewport canvas */}
+      <Canvas
+        width={width}
+        height={height}
+        onCursorMove={emitCursorMove}
+        onStrokeCommit={handleStrokeCommit}
+      />
 
-      {/* Floating toolbar on the left */}
+      {/* Remote cursors float above canvas */}
+      <RemoteCursors />
+
+      {/* Floating toolbar */}
       <Toolbar />
 
-      {/* Top bar with room name and controls */}
+      {/* Top controls bar */}
       <BoardControls
         roomName={currentRoom?.name || 'Whiteboard'}
         onLeave={handleLeave}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onClear={handleClear}
       />
 
-      {/* Participants indicator — bottom right */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl px-3 py-2">
-        <div className="flex -space-x-2">
-          {currentRoom?.participants.slice(0, 5).map((p) => (
-            <div
-              key={p._id}
-              title={p.name}
-              className="w-7 h-7 rounded-full bg-indigo-600 border-2 border-slate-800 flex items-center justify-center text-xs text-white font-medium"
-            >
-              {p.name.charAt(0).toUpperCase()}
-            </div>
-          ))}
-        </div>
-        <span className="text-slate-400 text-xs">
-          {currentRoom?.participants.length ?? 1} online
-        </span>
-      </div>
+      {/* Online users — bottom right */}
+      <OnlineUsers />
     </div>
   );
 };
