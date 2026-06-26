@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database';
 import authRoutes from './routes/auth';
+import roomRoutes from './routes/rooms';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/rooms', roomRoutes);
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);

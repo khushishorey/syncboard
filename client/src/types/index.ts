@@ -19,12 +19,20 @@ export interface Stroke {
   timestamp: number;
 }
 
+export interface RoomParticipant {
+  _id: string;
+  name: string;
+  email: string;
+}
+
 export interface Room {
-  id: string;
+  _id: string;
   name: string;
   inviteCode: string;
-  owner: string;
-  participants: User[];
+  owner: RoomParticipant;
+  participants: RoomParticipant[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ChatMessage {
