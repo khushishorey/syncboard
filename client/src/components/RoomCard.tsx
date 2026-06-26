@@ -10,10 +10,11 @@ interface Props {
 const RoomCard = ({ room }: Props) => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { leaveRoom } = useRoomStore();
+  const { leaveRoom, setCurrentRoom } = useRoomStore();
   const isOwner = room.owner._id === user?.id;
 
   const handleEnter = () => {
+    setCurrentRoom(room);          // store the room so whiteboard can use it
     navigate(`/room/${room._id}`);
   };
 
