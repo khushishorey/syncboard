@@ -3,17 +3,12 @@ import { socket } from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { usePresenceStore } from '../store/presenceStore';
 import { useBoardStore } from '../store/boardStore';
+import type { Stroke } from '../types';
 
 export const useSocket = (roomId: string) => {
   const { user } = useAuthStore();
-  const {
-    addUser,
-    removeUser,
-    updateCursor,
-    clearPresence,
-  } = usePresenceStore();
-  const { addRemoteStroke, removeStroke, clearBoard, setStrokes } =
-    useBoardStore();
+  const { addUser, removeUser, updateCursor, clearPresence } = usePresenceStore();
+  const { addRemoteStroke, removeStroke, clearBoard, setStrokes } = useBoardStore();
 
   const roomIdRef = useRef(roomId);
   roomIdRef.current = roomId;
@@ -21,12 +16,15 @@ export const useSocket = (roomId: string) => {
   useEffect(() => {
     if (!roomId || !user) return;
 
-    // ── Connect and authenticate ──────────────────────────────
     socket.connect();
 
-    // ── Join the socket room once connected ───────────────────
     socket.on('connect', () => {
       console.log('Socket connected:', socket.id);
+      socket.emit('join-room', { roomId });
+    });
+
+    socket.io.on('reconnect', () => {
+      console.log('Socket reconnected — rejoining room');
       socket.emit('join-room', { roomId });
     });
 
@@ -34,7 +32,7 @@ export const useSocket = (roomId: string) => {
       console.error('Socket connection error:', err.message);
     });
 
-    // ── Presence events ───────────────────────────────────────
+    // ── Presence ───────────────────────────────────────────────
     socket.on('user-joined', ({ userId, name }) => {
       addUser(userId, name);
     });
@@ -44,12 +42,14 @@ export const useSocket = (roomId: string) => {
       console.log(`${name} left the room`);
     });
 
-    // ── Cursor events ─────────────────────────────────────────
+    // ── Cursors ────────────────────────────────────────────────
     socket.on('cursor-update', (data) => {
       updateCursor({ ...data, lastSeen: Date.now() });
     });
 
-    // ── Drawing events (handlers ready for Milestone 6) ───────
+    // ── Drawing — remote events ────────────────────────────────
+    // These only fire for OTHER users' actions
+    // (server uses socket.to() which excludes the sender)
     socket.on('draw', ({ stroke }) => {
       addRemoteStroke(stroke);
     });
@@ -62,18 +62,25 @@ export const useSocket = (roomId: string) => {
       addRemoteStroke(stroke);
     });
 
-    socket.on('clear-board', () => {
-      clearBoard();
+    // clear-board uses io.to() so it fires for EVERYONE including sender
+    // WhiteboardPage calls clearBoard() locally first then emits
+    // so we only respond to this if it came from someone else
+    socket.on('clear-board', ({ userId: senderId }) => {
+      if (senderId !== user.id) {
+        clearBoard();
+      }
     });
 
+    // ── Board state — sent to late joiners on join ─────────────
     socket.on('board-state', ({ strokes }) => {
+      console.log(`Received board state: ${strokes.length} strokes`);
       setStrokes(strokes);
     });
 
-    // ── Cleanup on unmount ────────────────────────────────────
     return () => {
       socket.emit('leave-room', { roomId });
       socket.off('connect');
+      socket.io.off('reconnect');
       socket.off('connect_error');
       socket.off('user-joined');
       socket.off('user-left');
@@ -88,14 +95,15 @@ export const useSocket = (roomId: string) => {
     };
   }, [roomId, user]);
 
-  // Expose a throttled cursor emitter for the canvas to call
+  // ── Emitters (called by WhiteboardPage) ───────────────────────
+
   const emitCursorMove = (x: number, y: number) => {
     if (socket.connected) {
       socket.emit('cursor-move', { roomId, x, y });
     }
   };
 
-  const emitDraw = (stroke: import('../types').Stroke) => {
+  const emitDraw = (stroke: Stroke) => {
     if (socket.connected) {
       socket.emit('draw', { roomId, stroke });
     }
@@ -107,7 +115,7 @@ export const useSocket = (roomId: string) => {
     }
   };
 
-  const emitRedo = (stroke: import('../types').Stroke) => {
+  const emitRedo = (stroke: Stroke) => {
     if (socket.connected) {
       socket.emit('redo', { roomId, stroke });
     }

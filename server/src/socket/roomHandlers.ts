@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from './middleware';
+import { sendBoardState } from './drawHandlers';
 
 export const registerRoomHandlers = (
   io: Server,
@@ -12,7 +13,6 @@ export const registerRoomHandlers = (
     try {
       // Verify the user is actually a participant of this room
       const Room = (await import('../models/Room')).default;
-      const mongoose = await import('mongoose');
 
       const room = await Room.findById(roomId);
       if (!room) {
@@ -34,12 +34,16 @@ export const registerRoomHandlers = (
 
       console.log(`${name} joined room ${roomId}`);
 
-      // Tell everyone else in the room this user joined
+      // Tell everyone else this user joined
       socket.to(roomId).emit('user-joined', {
         userId,
         name,
         participants: [],
       });
+
+      // Send the current board state ONLY to the joining socket
+      // so late joiners see all existing strokes immediately
+      await sendBoardState(socket, roomId);
 
     } catch (err) {
       console.error('join-room error:', err);

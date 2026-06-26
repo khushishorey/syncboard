@@ -80,11 +80,25 @@ const WhiteboardPage = () => {
   };
 
   // Clear with socket sync
+  // clearBoard() applies locally immediately
+  // server will echo back to others via io.to(roomId)
   const handleClear = () => {
     const confirmed = window.confirm('Clear the entire board for everyone?');
     if (!confirmed) return;
-    clearBoard();
-    emitClearBoard();
+    clearBoard();       // local — instant feel
+    emitClearBoard();   // server broadcasts to others
+  };
+
+  // Export board as PNG using Konva's toDataURL
+  const handleSave = () => {
+    const stage = document.querySelector('canvas');
+    if (!stage) return;
+
+    // Konva attaches to the first canvas — use its toDataURL
+    const link = document.createElement('a');
+    link.download = `${currentRoom?.name || 'board'}-${Date.now()}.png`;
+    link.href = stage.toDataURL('image/png');
+    link.click();
   };
 
   if (loading) {
@@ -129,12 +143,13 @@ const WhiteboardPage = () => {
       <Toolbar />
 
       {/* Top controls bar */}
-      <BoardControls
+        <BoardControls
         roomName={currentRoom?.name || 'Whiteboard'}
         onLeave={handleLeave}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onClear={handleClear}
+        onSave={handleSave}
       />
 
       {/* Online users — bottom right */}

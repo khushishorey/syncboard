@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/database';
 import authRoutes from './routes/auth';
 import roomRoutes from './routes/rooms';
+import boardRoutes from './routes/boards';
 import { initializeSocket } from './socket';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/boards', boardRoutes);
 
 // Initialize all socket logic
 initializeSocket(io);

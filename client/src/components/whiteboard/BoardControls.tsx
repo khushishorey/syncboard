@@ -6,9 +6,10 @@ interface Props {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
+  onSave: () => void;
 }
 
-const BoardControls = ({ roomName, onLeave, onUndo, onRedo, onClear }: Props) => {
+const BoardControls = ({ roomName, onLeave, onUndo, onRedo, onClear, onSave }: Props) => {
   const { undoStack, redoStack } = useBoardStore();
 
   return (
@@ -29,9 +30,16 @@ const BoardControls = ({ roomName, onLeave, onUndo, onRedo, onClear }: Props) =>
 
       {/* Controls — right */}
       <div className="pointer-events-auto flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2">
-        <ControlButton label="↩" title="Undo (Ctrl+Z)" disabled={undoStack.length === 0} onClick={onUndo} />
-        <ControlButton label="↪" title="Redo (Ctrl+Y)" disabled={redoStack.length === 0} onClick={onRedo} />
+        <ControlButton
+          label="↩" title="Undo (Ctrl+Z)"
+          disabled={undoStack.length === 0} onClick={onUndo}
+        />
+        <ControlButton
+          label="↪" title="Redo (Ctrl+Y)"
+          disabled={redoStack.length === 0} onClick={onRedo}
+        />
         <div className="w-px h-5 bg-slate-600 mx-1" />
+        <ControlButton label="💾" title="Save board" disabled={false} onClick={onSave} />
         <ControlButton label="🗑" title="Clear board" disabled={false} onClick={onClear} />
       </div>
     </div>
