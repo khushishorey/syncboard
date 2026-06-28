@@ -7,11 +7,17 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
   SOCKET_URL,
   {
     autoConnect: false,
-    // JWT sent in the handshake so the server can authenticate
-    // before any event is processed
+    // In production, start with polling then upgrade to WebSocket
+    // This handles Render's cold start and proxy behaviour
+    transports: ['polling', 'websocket'],
     auth: (cb) => {
       const token = localStorage.getItem('token');
       cb({ token });
     },
+    // Reconnection config
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
   }
 );
