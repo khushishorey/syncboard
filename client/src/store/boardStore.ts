@@ -112,4 +112,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   setStrokes: (strokes) => {
     set({ strokes, currentStroke: null, undoStack: [], redoStack: [] });
   },
+
+  // Convenience getter — used by useAutoSave dirty tracking
+  getStrokeCount: () => get().strokes.length,
 }));
