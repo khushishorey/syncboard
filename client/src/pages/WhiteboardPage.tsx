@@ -3,12 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../store/roomStore';
 import { useBoardStore } from '../store/boardStore';
 import { useAuthStore } from '../store/authStore';
+import { useChatStore } from '../store/chatStore';
 import { useSocket } from '../hooks/useSocket';
 import Canvas from '../components/whiteboard/Canvas';
 import Toolbar from '../components/whiteboard/Toolbar';
 import BoardControls from '../components/whiteboard/BoardControls';
 import RemoteCursors from '../components/whiteboard/RemoteCursors';
 import OnlineUsers from '../components/whiteboard/OnlineUsers';
+import ChatPanel from '../components/whiteboard/ChatPanel';
+import ChatToggle from '../components/whiteboard/ChatToggle';
 import useWindowSize from '../hooks/useWindowSize';
 import type { Stroke } from '../types';
 
@@ -19,22 +22,24 @@ const WhiteboardPage = () => {
 
   const { currentRoom, setCurrentRoom } = useRoomStore();
   const { clearBoard, undo, redo } = useBoardStore();
-  const { user } = useAuthStore();
+  const { isChatOpen } = useChatStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // All socket logic lives here
-  const { emitCursorMove, emitDraw, emitUndo, emitRedo, emitClearBoard } =
-    useSocket(id || '');
+  const {
+    emitCursorMove,
+    emitDraw,
+    emitUndo,
+    emitRedo,
+    emitClearBoard,
+    emitChatMessage,
+  } = useSocket(id || '');
 
   useEffect(() => {
     const loadRoom = async () => {
       if (!id) return;
-      if (currentRoom?._id === id) {
-        setLoading(false);
-        return;
-      }
+      if (currentRoom?._id === id) { setLoading(false); return; }
       try {
         const { api } = await import('../lib/api');
         const { data } = await api.get(`/rooms/${id}`);
@@ -45,7 +50,6 @@ const WhiteboardPage = () => {
         setLoading(false);
       }
     };
-
     loadRoom();
     clearBoard();
   }, [id]);
@@ -56,12 +60,10 @@ const WhiteboardPage = () => {
     navigate('/dashboard');
   };
 
-  // Called by Canvas when a stroke is committed
   const handleStrokeCommit = (stroke: Stroke) => {
     emitDraw(stroke);
   };
 
-  // Undo with socket sync
   const handleUndo = () => {
     const { undoStack } = useBoardStore.getState();
     if (undoStack.length === 0) return;
@@ -70,7 +72,6 @@ const WhiteboardPage = () => {
     emitUndo(lastId);
   };
 
-  // Redo with socket sync
   const handleRedo = () => {
     const { redoStack } = useBoardStore.getState();
     if (redoStack.length === 0) return;
@@ -79,22 +80,16 @@ const WhiteboardPage = () => {
     emitRedo(stroke);
   };
 
-  // Clear with socket sync
-  // clearBoard() applies locally immediately
-  // server will echo back to others via io.to(roomId)
   const handleClear = () => {
     const confirmed = window.confirm('Clear the entire board for everyone?');
     if (!confirmed) return;
-    clearBoard();       // local — instant feel
-    emitClearBoard();   // server broadcasts to others
+    clearBoard();
+    emitClearBoard();
   };
 
-  // Export board as PNG using Konva's toDataURL
   const handleSave = () => {
     const stage = document.querySelector('canvas');
     if (!stage) return;
-
-    // Konva attaches to the first canvas — use its toDataURL
     const link = document.createElement('a');
     link.download = `${currentRoom?.name || 'board'}-${Date.now()}.png`;
     link.href = stage.toDataURL('image/png');
@@ -113,10 +108,8 @@ const WhiteboardPage = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4">
         <p className="text-red-400">{error}</p>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm"
-        >
+        <button onClick={() => navigate('/dashboard')}
+          className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm">
           Back to dashboard
         </button>
       </div>
@@ -124,26 +117,27 @@ const WhiteboardPage = () => {
   }
 
   return (
-    <div
-      className="relative overflow-hidden"
-      style={{ width: '100vw', height: '100vh', background: '#0f172a' }}
-    >
-      {/* Full-viewport canvas */}
-      <Canvas
-        width={width}
-        height={height}
-        onCursorMove={emitCursorMove}
-        onStrokeCommit={handleStrokeCommit}
-      />
+    <div className="relative overflow-hidden"
+      style={{ width: '100vw', height: '100vh', background: '#0f172a' }}>
 
-      {/* Remote cursors float above canvas */}
+      {/* Canvas shrinks horizontally when chat is open */}
+      <div style={{ width: isChatOpen ? `calc(100vw - 288px)` : '100vw', height: '100vh' }}>
+        <Canvas
+          width={isChatOpen ? width - 288 : width}
+          height={height}
+          onCursorMove={emitCursorMove}
+          onStrokeCommit={handleStrokeCommit}
+        />
+      </div>
+
+      {/* Remote cursors — above canvas */}
       <RemoteCursors />
 
-      {/* Floating toolbar */}
+      {/* Left toolbar */}
       <Toolbar />
 
-      {/* Top controls bar */}
-        <BoardControls
+      {/* Top controls */}
+      <BoardControls
         roomName={currentRoom?.name || 'Whiteboard'}
         onLeave={handleLeave}
         onUndo={handleUndo}
@@ -152,8 +146,19 @@ const WhiteboardPage = () => {
         onSave={handleSave}
       />
 
-      {/* Online users — bottom right */}
-      <OnlineUsers />
+      {/* Chat toggle button — bottom right */}
+      <ChatToggle />
+
+      {/* Online users — bottom right (shifts left when chat open) */}
+      <div className="absolute bottom-4 z-10"
+        style={{ right: isChatOpen ? '308px' : '64px', transition: 'right 0.2s ease' }}>
+        <OnlineUsers />
+      </div>
+
+      {/* Chat panel — slides in from right */}
+      {isChatOpen && (
+        <ChatPanel onSendMessage={emitChatMessage} />
+      )}
     </div>
   );
 };

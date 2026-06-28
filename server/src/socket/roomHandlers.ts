@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from './middleware';
 import { sendBoardState } from './drawHandlers';
+import { sendChatHistory } from './chatHandlers';
 
 export const registerRoomHandlers = (
   io: Server,
@@ -44,6 +45,7 @@ export const registerRoomHandlers = (
       // Send the current board state ONLY to the joining socket
       // so late joiners see all existing strokes immediately
       await sendBoardState(socket, roomId);
+      await sendChatHistory(socket, roomId);
 
     } catch (err) {
       console.error('join-room error:', err);

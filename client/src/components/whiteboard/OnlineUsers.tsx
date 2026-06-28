@@ -23,9 +23,8 @@ const OnlineUsers = () => {
   );
 
   return (
-    <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl px-3 py-2 z-10">
+    <div className="flex items-center gap-2 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl px-3 py-2">
       <div className="flex -space-x-2">
-        {/* Current user always shown first */}
         <div
           title={`${user?.name} (you)`}
           className="w-7 h-7 rounded-full border-2 border-slate-800 flex items-center justify-center text-xs text-white font-medium"

@@ -3,12 +3,14 @@ import { socket } from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { usePresenceStore } from '../store/presenceStore';
 import { useBoardStore } from '../store/boardStore';
+import { useChatStore } from '../store/chatStore';
 import type { Stroke } from '../types';
 
 export const useSocket = (roomId: string) => {
   const { user } = useAuthStore();
   const { addUser, removeUser, updateCursor, clearPresence } = usePresenceStore();
   const { addRemoteStroke, removeStroke, clearBoard, setStrokes } = useBoardStore();
+  const { addMessage, setHistory, clearChat } = useChatStore();
 
   const roomIdRef = useRef(roomId);
   roomIdRef.current = roomId;
@@ -47,9 +49,7 @@ export const useSocket = (roomId: string) => {
       updateCursor({ ...data, lastSeen: Date.now() });
     });
 
-    // ── Drawing — remote events ────────────────────────────────
-    // These only fire for OTHER users' actions
-    // (server uses socket.to() which excludes the sender)
+    // ── Drawing ────────────────────────────────────────────────
     socket.on('draw', ({ stroke }) => {
       addRemoteStroke(stroke);
     });
@@ -73,10 +73,19 @@ export const useSocket = (roomId: string) => {
 
     // ── Board state — sent to late joiners on join ─────────────
     socket.on('board-state', ({ strokes }) => {
-      console.log(`Received board state: ${strokes.length} strokes`);
       setStrokes(strokes);
     });
 
+    // ── Chat ───────────────────────────────────────────────────
+    socket.on('chat-history', (messages) => {
+      setHistory(messages);
+    });
+
+    socket.on('chat-message', (message) => {
+      addMessage(message);
+    });
+
+    // ── Cleanup ────────────────────────────────────────────────
     return () => {
       socket.emit('leave-room', { roomId });
       socket.off('connect');
@@ -90,42 +99,48 @@ export const useSocket = (roomId: string) => {
       socket.off('redo');
       socket.off('clear-board');
       socket.off('board-state');
+      socket.off('chat-history');
+      socket.off('chat-message');
       socket.disconnect();
       clearPresence();
+      clearChat();
     };
   }, [roomId, user]);
 
-  // ── Emitters (called by WhiteboardPage) ───────────────────────
+  // ── Emitters ───────────────────────────────────────────────────
 
   const emitCursorMove = (x: number, y: number) => {
-    if (socket.connected) {
-      socket.emit('cursor-move', { roomId, x, y });
-    }
+    if (socket.connected) socket.emit('cursor-move', { roomId, x, y });
   };
 
   const emitDraw = (stroke: Stroke) => {
-    if (socket.connected) {
-      socket.emit('draw', { roomId, stroke });
-    }
+    if (socket.connected) socket.emit('draw', { roomId, stroke });
   };
 
   const emitUndo = (strokeId: string) => {
-    if (socket.connected) {
-      socket.emit('undo', { roomId, strokeId });
-    }
+    if (socket.connected) socket.emit('undo', { roomId, strokeId });
   };
 
   const emitRedo = (stroke: Stroke) => {
-    if (socket.connected) {
-      socket.emit('redo', { roomId, stroke });
-    }
+    if (socket.connected) socket.emit('redo', { roomId, stroke });
   };
 
   const emitClearBoard = () => {
-    if (socket.connected) {
-      socket.emit('clear-board', { roomId });
+    if (socket.connected) socket.emit('clear-board', { roomId });
+  };
+
+  const emitChatMessage = (content: string) => {
+    if (socket.connected && content.trim()) {
+      socket.emit('chat-message', { roomId, content: content.trim() });
     }
   };
 
-  return { emitCursorMove, emitDraw, emitUndo, emitRedo, emitClearBoard };
+  return {
+    emitCursorMove,
+    emitDraw,
+    emitUndo,
+    emitRedo,
+    emitClearBoard,
+    emitChatMessage,
+  };
 };
