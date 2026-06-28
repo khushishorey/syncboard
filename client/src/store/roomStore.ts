@@ -15,8 +15,8 @@ interface RoomState {
   clearError: () => void;
 }
 
-export const useRoomStore = create<RoomState>((set, get) => ({
-  rooms: [],
+export const useRoomStore = create<RoomState>((set, _get) => ({  // The underscore prefix (infront of get)
+  rooms: [],                                      //  tells TypeScript "I know this is unused, that's intentional."      
   currentRoom: null,
   isLoading: false,
   error: null,

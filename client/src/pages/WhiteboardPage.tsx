@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../store/roomStore';
 import { useBoardStore } from '../store/boardStore';
-import { useAuthStore } from '../store/authStore';
 import { useChatStore } from '../store/chatStore';
 import { useSocket } from '../hooks/useSocket';
 import { useAutoSave } from '../hooks/useAutoSave';

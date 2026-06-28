@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '../../store/chatStore';
-import { useAuthStore } from '../../store/authStore';
 import ChatMessageBubble from './ChatMessage';
 
 interface Props {
@@ -9,7 +8,6 @@ interface Props {
 
 const ChatPanel = ({ onSendMessage }: Props) => {
   const { messages, markAllRead, toggleChat } = useChatStore();
-  const { user } = useAuthStore();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
