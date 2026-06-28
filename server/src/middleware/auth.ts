@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, TokenPayload } from '../config/jwt';
 
-// Extend Express Request so downstream handlers get req.user
+// Extend the base Express Request directly
+// This makes body, params, query, headers all available on AuthRequest
 export interface AuthRequest extends Request {
   user?: TokenPayload;
 }

@@ -2,11 +2,12 @@ import { Response } from 'express';
 import Room from '../models/Room';
 import { AuthRequest } from '../middleware/auth';
 import { generateInviteCode } from '../config/inviteCode';
+import mongoose from 'mongoose';
 
 // POST /api/rooms — create a new room
 export const createRoom = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name } = req.body;
+    const name = req.body['name'];
     const userId = req.user?.userId;
 
     if (!userId) {
@@ -28,7 +29,7 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     const room = await Room.create({
-      name: name.trim(),
+      name: String(name).trim(),
       inviteCode,
       owner: userId,
       participants: [userId],  // creator is automatically a participant
@@ -47,7 +48,7 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
 // POST /api/rooms/join — join via invite code
 export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { inviteCode } = req.body;
+    const inviteCode = req.body['inviteCode'];
     const userId = req.user?.userId;
 
     if (!inviteCode) {
@@ -55,7 +56,7 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const room = await Room.findOne({ inviteCode: inviteCode.toUpperCase() });
+    const room = await Room.findOne({ inviteCode: String(inviteCode).toUpperCase() });
 
     if (!room) {
       res.status(404).json({ message: 'Room not found — check your invite code' });
@@ -66,8 +67,8 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
       (p) => p.toString() === userId
     );
 
-    if (!alreadyIn) {
-      room.participants.push(new (require('mongoose').Types.ObjectId)(userId));
+    if (!alreadyIn && userId) {
+      room.participants.push(new mongoose.Types.ObjectId(userId));
       await room.save();
     }
 
@@ -102,7 +103,7 @@ export const getMyRooms = async (req: AuthRequest, res: Response): Promise<void>
 export const getRoomById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { id } = req.params;
+    const id = req.params['id'];
 
     const room = await Room.findById(id)
       .populate('owner', 'name email')
@@ -133,7 +134,7 @@ export const getRoomById = async (req: AuthRequest, res: Response): Promise<void
 export const leaveRoom = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
-    const { id } = req.params;
+    const id = req.params['id'];
 
     const room = await Room.findById(id);
 
